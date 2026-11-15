@@ -1,0 +1,157 @@
+name: "Linux Build"
+
+on: [push]
+
+jobs:
+  # Native linux builds
+  native:
+    name: 'Native: ${{ matrix.os }}: ${{ matrix.compiler }}'
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-22.04
+          - ubuntu-24.04
+        compiler: [gnu, llvm]  # See the ci-tools setup action's compiler input.
+
+    env:
+      TARGET_WORKSPACE: "${{ github.workspace }}/projects"
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v6
+      with:
+        fetch-depth: 1
+
+    - name: ccache
+      uses: hendrikmuhs/ccache-action@v1.2
+      with:
+        key: ${{ github.job }}-${{ matrix.os }}-${{ matrix.compiler }}
+        max-size: 128M
+
+    - name: Setup
+      uses: netsurf-browser/ci-tools/.github/actions/setup@master
+      with:
+        compiler: ${{ matrix.compiler }}
+        env-sh: docs/env.sh
+        make-tools: true
+        extra-packages: >-
+          ccache
+          libcurl4-openssl-dev
+          libgtk-3-dev
+          libhtml-parser-perl
+          libjpeg-dev
+          libpng-dev
+          librsvg2-dev
+          libutf8proc-dev
+          wbritish
+
+    - name: Disable -Werror
+      # We can remove this step if we ever move to GitHub properly.
+      run: |
+          find . -type f -name Makefile | xargs sed -i 's/-Werror//'
+
+    - name: Unit Tests
+      # Fails when built with clang:
+      #  test/corestrings.c:58:F:corestrings:corestrings_test:486:
+      #  Assertion 'ires == NSERROR_NOMEM' failed: ires == 0, NSERROR_NOMEM == 2
+      # Looks like `malloc_limit()` not working.
+      if: ${{ matrix.compiler != 'llvm' }}
+      run: |
+          source docs/env.sh || exit 1
+          make test
+
+    - name: Build NetSurf GTK
+      run: |
+          source docs/env.sh || exit 1
+          make -j"$(nproc)" TARGET=gtk
+
+    - name: Build NetSurf Monkey
+      run: |
+          source docs/env.sh || exit 1
+          make -j"$(nproc)" TARGET=monkey
+
+    - name: Build NetSurf Framebuffer
+      run: |
+          source docs/env.sh || exit 1
+          make -j"$(nproc)" TARGET=framebuffer
+
+  # Cross compile using toolchains built in the toolchains repo.
+  cross:
+    name: 'Cross: ${{ matrix.build.toolchain }}' # ATM toolchain unique across builds
+    runs-on: ubuntu-24.04 # Matches toolchains workflow
+    strategy:
+      fail-fast: false
+      matrix:
+        build:
+          - { toolchain: arm-riscos-gnueabi,   frontend: riscos,   pkg-file: netsurf.zip }
+          - { toolchain: arm-unknown-riscos,   frontend: riscos,   pkg-file: netsurf.zip }
+          - { toolchain: i686-w64-mingw32,     frontend: windows,  pkg-file: netsurf-installer.exe }
+          - { toolchain: m5475-atari-mint,     frontend: atari,    pkg-file: nsv4e.zip }
+          - { toolchain: m68k-atari-mint,      frontend: atari,    pkg-file: ns020.zip }
+          - { toolchain: m68k-unknown-amigaos, frontend: amigaos3, pkg-file: NetSurf_Amiga/netsurf.lha }
+          - { toolchain: ppc-amigaos,          frontend: amiga,    pkg-file: NetSurf_Amiga/netsurf.lha }
+          - { toolchain: x86_64-w64-mingw32,   frontend: windows,  pkg-file: netsurf-installer.exe }
+
+    env:
+      HOST: ${{ matrix.build.toolchain }}
+      TARGET_WORKSPACE: "${{ github.workspace }}/projects"
+      Q: ""
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v6
+      with:
+        fetch-depth: 1
+
+    - name: ccache
+      uses: hendrikmuhs/ccache-action@v1.2
+      with:
+        key: ${{ github.job }}-${{ matrix.build.toolchain }}
+        max-size: 128M
+
+    - name: Install toolchain
+      uses: netsurf-browser/ci-tools/.github/actions/install-toolchain@master
+      with:
+        toolchain: ${{ matrix.build.toolchain }}
+
+    - name: Setup
+      uses: netsurf-browser/ci-tools/.github/actions/setup@master
+      with:
+        env-sh: docs/env.sh
+        make-tools: true
+        # jlha-utils and nsis are for packaging (Amiga .lha, Windows installer).
+        extra-packages: >-
+          ccache
+          jlha-utils
+          libcurl4-openssl-dev
+          libgtk-3-dev
+          libhtml-parser-perl
+          libjpeg-dev
+          libpng-dev
+          librsvg2-dev
+          nsis
+
+    - name: Build NetSurf
+      env:
+        FRONTEND: ${{ matrix.build.frontend }}
+      run: |
+          source docs/env.sh || exit 1
+          make -j"$(nproc)" TARGET="$FRONTEND" Q=
+
+    - name: Make package
+      env:
+        FRONTEND: ${{ matrix.build.frontend }}
+      run: |
+          source docs/env.sh || exit 1
+          make package TARGET="$FRONTEND" Q=
+
+    # Can't avoid `upload-artifact` zipping the package
+    # https://github.com/actions/upload-artifact/issues/426
+    - name: Upload artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ matrix.build.toolchain }}-${{ matrix.build.frontend }}
+        path: ${{ matrix.build.pkg-file }}
+        compression-level: 0 # Avoid pointless recompression
