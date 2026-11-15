@@ -25,3 +25,16 @@ NetSurf
 core
 nsfb-*
 build
+
+# ---- Nodus additions ----
+/build/
+/libnodus.so*
+/netsurf-buildsystem/
+/libcss/
+/libdom/
+/libhubbub/
+/libparserutils/
+/libwapcaplet/
+/libnsgif/
+/libnsbmp/
+/libsvgtiny/
