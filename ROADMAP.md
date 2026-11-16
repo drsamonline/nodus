@@ -75,3 +75,17 @@ no crash; `examples/minimal-frontend/` still compiles against the frozen ABI.
 The ABI lands early and freezes late; rendering work fills the middle. If the text
 frontend slips, the headless frontend moves up, because the family needs an oracle more
 than it needs a terminal browser - and the text frontend is the harder of the two.
+
+## Deferred by decision (2026-11-16)
+
+**The family landing page.** Once all four browsers are finished, one page listing the
+ladder, the licences and the honest state of each project goes in the hub repo
+(`drsamonline.github.io`) - not in a fifth repository, and not before. A landing page
+that advertises four unfinished browsers is worse than no landing page.
+
+The trigger is concrete, not a date: Aetheris, Nodus, Sorex and Volumen all at v1.0, or
+the point where one of them is good enough that a stranger would actually try it. Until
+then, `FAMILY.md` in each repo is the family's front door and it is enough.
+
+**No fifth repo.** The family is four browsers and a shared contract. Anything that
+wants to be a fifth repository has to justify itself against that.
