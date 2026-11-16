@@ -181,3 +181,26 @@ against `expect/`, reporting per-requirement pass rates from
 **Measured by.** It is the measurement.
 
 **Risk.** Very low, and it unblocks every other criterion.
+
+## Prior art in this tree
+
+Every item below already has a home upstream. Read it before designing the
+replacement — nine frontends exist because the core/frontend boundary already
+works.
+
+| Innovation | Where upstream already does part of this |
+| --- | --- |
+| I1 `libnodus` ABI | `include/` (the headers to formalise), `frontends/` (the nine consumers) |
+| I2 text frontend | `frontends/monkey/` (a headless frontend that proves the shape) |
+| I3 headless renderer | `frontends/monkey/` (the test harness to productise) |
+| I4 content-addressed cache | `content/llcache.c`, `content/fs_backing_store.c` (URL-keyed today) |
+| I5 dirty-region relayout | `desktop/layout.c` |
+| I6 arena allocator | `desktop/layout.c` (box allocation) |
+| I7 fuzzing | `test/` (the existing harnesses) |
+| I8 sandboxed decoder | `content/handlers/image/` (where decoding happens) |
+| I9 JavaScript backend interface | `content/handlers/javascript/` (Duktape today, WebIDL-driven) |
+| I10 corpus runner | `test/`, `content/handlers/html/` |
+
+The core/frontend split is upstream's, not this fork's invention. Before adding a
+hook, read how `frontends/monkey` and `frontends/framebuffer` already use the
+existing one.
